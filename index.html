@@ -18,6 +18,17 @@
     <link type="text/css" rel="stylesheet" href="//cdn.jsdelivr.net/npm/jsmind@0.8.5/style/jsmind.css" />
     <script type="text/javascript" src="//cdn.jsdelivr.net/npm/jsmind@0.8.5/es6/jsmind.js"></script>
     <div id="errorDiv" style="color:red; font-weight:bold; padding:10px;"></div>
+    <!-- Modal for magnified image -->
+    <div id="imgModal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;">
+      <span id="imgModalClose" style="position:absolute;top:30px;right:60px;font-size:48px;color:#fff;cursor:pointer;z-index:1001;">&times;</span>
+      <img id="imgModalImg" src="" alt="Magnified" style="box-shadow:0 0 30px #000;display:block;margin:auto;border-radius:12px;">
+    </div>
+    <style>
+      .taxon-img { cursor: pointer; transition: box-shadow 0.2s; }
+      .taxon-img:hover { box-shadow: 0 0 12px #0077ff88; }
+      #imgModal { display: flex; }
+      #imgModalImg { max-width: none; max-height: none; }
+    </style>
     <script>
 
     // Helper: robustly detect image extension for a taxon, with debug logging
@@ -67,7 +78,7 @@
         data.forEach(row => {
             let taxon = row['Taxon'];
             let imgFile = taxonToImg(taxon);
-            let imgTag = imgFile ? `![](${imgFile}) ` : '';
+            let imgTag = imgFile ? `![](${imgFile} ", class=\"taxon-img\") ` : '';
             md += `\n- ${imgTag}**${taxon}**`;
             Object.keys(row).forEach(key => {
                 if(key !== 'Taxon' && row[key]) {
@@ -197,6 +208,35 @@
             showError('jsMind error: ' + e);
         }
     }
+    // Magnify image modal logic
+    document.addEventListener('DOMContentLoaded', function() {
+      // Delegate click for dynamic images
+      document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('taxon-img')) {
+          const src = e.target.getAttribute('src');
+          const modal = document.getElementById('imgModal');
+          const modalImg = document.getElementById('imgModalImg');
+          modalImg.src = src;
+          // Get original displayed size
+          const rect = e.target.getBoundingClientRect();
+          const newWidth = rect.width * 4;
+          const newHeight = rect.height * 4;
+          modalImg.style.width = newWidth + 'px';
+          modalImg.style.height = newHeight + 'px';
+          modal.style.display = 'flex';
+        }
+      });
+
+      // Close modal on click of X or outside image
+      document.getElementById('imgModalClose').onclick = function() {
+        document.getElementById('imgModal').style.display = 'none';
+      };
+      document.getElementById('imgModal').onclick = function(e) {
+        if (e.target === this) {
+          this.style.display = 'none';
+        }
+      };
+    });
     </script>
     <noscript>Please enable JavaScript to view the mindmap.</noscript>
 </body>
