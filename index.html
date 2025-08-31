@@ -182,7 +182,16 @@
                 if(key !== 'Taxon' && row[key]) {
                     taxonNode.children.push({
                         id: taxon + '_' + key,
-                        topic: `<b>${key}:</b> ${row[key]}`
+                        topic: `<b>${key}</b>`,
+                        children: row[key].includes(',')
+                            ? row[key].split(',').map((v, i) => ({
+                                id: taxon + '_' + key + '_value_' + i,
+                                topic: v.trim()
+                            }))
+                            : [{
+                                id: taxon + '_' + key + '_value',
+                                topic: row[key]
+                            }]
                     });
                 }
             });
