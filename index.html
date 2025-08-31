@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insect Mindmap</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsmind@0.4.6/style/jsmind.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f6fa; }
+        #jsmind_container { width: 100vw; height: 100vh; background: #f5f6fa; }
+        .taxon-img { max-width: 80px; max-height: 80px; border-radius: 10px; box-shadow: 0 2px 8px #0002; display: block; margin: 0 auto 6px auto; }
+        .jmnode { text-align: center; }
+    </style>
+</head>
+<body>
+    <div id="jsmind_container" style="width:100vw;height:100vh;"></div>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <link type="text/css" rel="stylesheet" href="//cdn.jsdelivr.net/npm/jsmind@0.8.5/style/jsmind.css" />
+    <script type="text/javascript" src="//cdn.jsdelivr.net/npm/jsmind@0.8.5/es6/jsmind.js"></script>
+    <div id="errorDiv" style="color:red; font-weight:bold; padding:10px;"></div>
+    <script>
+
+    // Helper: robustly detect image extension for a taxon, with debug logging
+    function taxonToImg(taxon) {
+        const base = taxon.replace(/[^a-zA-Z0-9]/g, '_');
+        const exts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+        for (let ext of exts) {
+            if (window.taxonImgs && window.taxonImgs[base + ext]) return base + ext;
+        }
+        return '';
+    }
+
+    // Preload available images in the directory (by probing all plausible extensions)
+    function preloadImages(taxa, cb) {
+        let loaded = 0;
+        let found = {};
+        const exts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+        taxa.forEach(taxon => {
+            const base = taxon.replace(/[^a-zA-Z0-9]/g, '_');
+            let foundOne = false;
+            let remaining = exts.length;
+            exts.forEach(ext => {
+                const img = new Image();
+                img.onload = () => {
+                    if (!foundOne) {
+                        found[base + ext] = true;
+                        foundOne = true;
+                    }
+                    check();
+                };
+                img.onerror = () => { check(); };
+                img.src = base + ext;
+            });
+            function check() {
+                remaining--;
+                if (remaining === 0) {
+                    loaded++;
+                    if (loaded === taxa.length) cb(found);
+                }
+            }
+        });
+    }
+
+    // Build Markdown mindmap from CSV data
+    function buildMarkdownMindmap(data) {
+        let md = '# Insect Mindmap\n';
+        data.forEach(row => {
+            let taxon = row['Taxon'];
+            let imgFile = taxonToImg(taxon);
+            let imgTag = imgFile ? `![](${imgFile}) ` : '';
+            md += `\n- ${imgTag}**${taxon}**`;
+            Object.keys(row).forEach(key => {
+                if(key !== 'Taxon' && row[key]) {
+                    md += `\n    - **${key}:** ${row[key]}`;
+                }
+            });
+        });
+        return md;
+    }
+
+    // Load CSV and render mindmap
+    fetch('referencedata.csv')
+      .then(response => response.text())
+      .then(csv => {
+        Papa.parse(csv, {
+          header: true,
+          skipEmptyLines: true,
+          complete: function(results) {
+            const taxa = results.data.map(row => row['Taxon']);
+            preloadImages(taxa, function(foundImgs){
+                window.taxonImgs = foundImgs;
+                const md = buildMarkdownMindmap(results.data);
+                renderMarkmap(md);
+            });
+          },
+          error: function(err) {
+            document.getElementById('errorDiv').textContent = 'Error parsing CSV: ' + err.message;
+          }
+        });
+      })
+      .catch(err => {
+        document.getElementById('errorDiv').textContent = 'Error loading referencedata.csv: ' + err.message;
+      });
+
+    // Render mindmap using markmap
+    function renderMarkmap(md) {
+        const { Markmap, loadCSS, loadJS } = window.markmap;
+        Markmap.create('#mindmap', null, md);
+    }
+
+    // Show error in errorDiv
+    function showError(msg) {
+        document.getElementById('errorDiv').textContent = msg;
+        console.error(msg);
+    }
+
+    // Load CSV and build mindmap
+    fetch('referencedata.csv')
+      .then(response => {
+        if (!response.ok) throw new Error('Could not load referencedata.csv');
+        return response.text();
+      })
+      .then(csv => {
+        Papa.parse(csv, {
+          header: true,
+          skipEmptyLines: true,
+          complete: function(results) {
+            try {
+                const taxa = results.data.map(row => row['Taxon']);
+                preloadImages(taxa, function(foundImgs){
+                    window.taxonImgs = foundImgs;
+                    buildMindmap(results.data);
+                });
+            } catch (e) {
+                showError('Error building mindmap: ' + e);
+            }
+          },
+          error: function(err) {
+            showError('Error parsing CSV: ' + err.message);
+          }
+        });
+      })
+      .catch(err => {
+        showError('Error loading referencedata.csv: ' + err.message);
+      });
+
+    function buildMindmap(data) {
+        // Mindmap root
+        var mind = {
+            "meta":{
+                "name":"insect-mindmap",
+                "author":"Cascade",
+                "version":"1.0"
+            },
+            "format":"node_tree",
+            "data":{
+                "id":"root",
+                "topic":"Insect Mindmap",
+                "children":[]
+            }
+        };
+        data.forEach(row => {
+            var taxon = row['Taxon'];
+            var imgFile = taxonToImg(taxon);
+            var taxonNode = {
+                id: taxon,
+                topic: `<img src='${imgFile}' class='taxon-img' onerror=\"this.style.display='none'\"><div><b>${taxon}</b></div>`,
+                children: []
+            };
+            Object.keys(row).forEach(key => {
+                if(key !== 'Taxon' && row[key]) {
+                    taxonNode.children.push({
+                        id: taxon + '_' + key,
+                        topic: `<b>${key}:</b> ${row[key]}`
+                    });
+                }
+            });
+            mind.data.children.push(taxonNode);
+        });
+        var options = {
+            container:'jsmind_container',
+            editable:false,
+            theme:'primary',
+            view:{
+                line_width:2,
+                line_color:'#888',
+                draggable:true,
+                hmargin:40,
+                vmargin:20
+            }
+        };
+        try {
+            window.jm = new jsMind(options);
+            jm.show(mind);
+            console.log('Mindmap rendered successfully');
+        } catch (e) {
+            showError('jsMind error: ' + e);
+        }
+    }
+    </script>
+    <noscript>Please enable JavaScript to view the mindmap.</noscript>
+</body>
+</html>
