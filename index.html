@@ -176,13 +176,15 @@
             var taxonNode = {
                 id: taxon,
                 topic: `<img src='${imgFile}' class='taxon-img' onerror=\"this.style.display='none'\"><div><b>${taxon}</b></div>`,
-                children: []
+                children: [],
+                expanded: false
             };
             Object.keys(row).forEach(key => {
                 if(key !== 'Taxon' && row[key]) {
                     taxonNode.children.push({
                         id: taxon + '_' + key,
                         topic: `<b>${key}</b>`,
+                        expanded: false,
                         children: row[key].includes(',')
                             ? row[key].split(',').map((v, i) => ({
                                 id: taxon + '_' + key + '_value_' + i,
@@ -212,6 +214,46 @@
         try {
             window.jm = new jsMind(options);
             jm.show(mind);
+            // --- Custom expand/collapse logic ---
+            var container = document.getElementById('jsmind_container');
+            if (!container) return;
+            var taxonNodes = container.querySelectorAll('.jmnode[data-nodeid]:not([data-nodeid="root"])');
+            function hideAllDescendants(nodeId) {
+                var children = Array.from(container.querySelectorAll('.jmnode[data-parentid="' + nodeId + '"]'));
+                children.forEach(function(child) {
+                    child.style.display = 'none';
+                    hideAllDescendants(child.getAttribute('data-nodeid'));
+                });
+            }
+            function showAllDescendants(nodeId) {
+                var children = Array.from(container.querySelectorAll('.jmnode[data-parentid="' + nodeId + '"]'));
+                children.forEach(function(child) {
+                    child.style.display = '';
+                    showAllDescendants(child.getAttribute('data-nodeid'));
+                });
+            }
+            // Collapse all on load
+            taxonNodes.forEach(function(node) {
+                hideAllDescendants(node.getAttribute('data-nodeid'));
+            });
+            // Click handler: expand one, collapse others
+            taxonNodes.forEach(function(node) {
+                if (!node._expandHandlerAdded) {
+                    node.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        // Collapse all sibling taxa
+                        taxonNodes.forEach(function(n) {
+                            if (n !== node) {
+                                hideAllDescendants(n.getAttribute('data-nodeid'));
+                            }
+                        });
+                        // Expand this
+                        showAllDescendants(node.getAttribute('data-nodeid'));
+                    });
+                    node._expandHandlerAdded = true;
+                }
+            });
+            // --- End custom logic ---
             console.log('Mindmap rendered successfully');
         } catch (e) {
             showError('jsMind error: ' + e);
