@@ -170,34 +170,40 @@
                 "children":[]
             }
         };
+        // Helper: get font size by depth
+        function getFontSize(depth) {
+            const fontSizes = [22, 18, 15, 13, 12, 11];
+            return fontSizes[Math.min(depth, fontSizes.length - 1)];
+        }
+        // Recursive builder for nodes with font size by depth
+        function buildNode(id, label, imgFile, children, depth) {
+            let fontSize = getFontSize(depth);
+            let topic = '';
+            if (imgFile && depth === 0) {
+                topic += `<img src='${imgFile}' class='taxon-img' onerror=\"this.style.display='none'\">`;
+            }
+            topic += `<div style='font-size:${fontSize}px;'><b>${label}</b></div>`;
+            return {
+                id: id,
+                topic: topic,
+                children: children,
+                expanded: false
+            };
+        }
         data.forEach(row => {
             var taxon = row['Taxon'];
             var imgFile = taxonToImg(taxon);
-            var taxonNode = {
-                id: taxon,
-                topic: `<img src='${imgFile}' class='taxon-img' onerror=\"this.style.display='none'\"><div><b>${taxon}</b></div>`,
-                children: [],
-                expanded: false
-            };
+            // Build children recursively with style
+            let children = [];
             Object.keys(row).forEach(key => {
                 if(key !== 'Taxon' && row[key]) {
-                    taxonNode.children.push({
-                        id: taxon + '_' + key,
-                        topic: `<b>${key}</b>`,
-                        expanded: false,
-                        children: row[key].includes(',')
-                            ? row[key].split(',').map((v, i) => ({
-                                id: taxon + '_' + key + '_value_' + i,
-                                topic: v.trim()
-                            }))
-                            : [{
-                                id: taxon + '_' + key + '_value',
-                                topic: row[key]
-                            }]
-                    });
+                    let propChildren = row[key].includes(',')
+                        ? row[key].split(',').map((v, i) => buildNode(taxon + '_' + key + '_value_' + i, v.trim(), '', [], 2))
+                        : [buildNode(taxon + '_' + key + '_value', row[key], '', [], 2)];
+                    children.push(buildNode(taxon + '_' + key, key, '', propChildren, 1));
                 }
             });
-            mind.data.children.push(taxonNode);
+            mind.data.children.push(buildNode(taxon, taxon, imgFile, children, 0));
         });
         var options = {
             container:'jsmind_container',
